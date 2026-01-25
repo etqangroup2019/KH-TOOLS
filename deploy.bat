@@ -37,10 +37,26 @@ set COMMIT_MSG="Release v%VERSION%: Update and Scatter improvements"
 echo [KH-Tools] Committing changes with message: %COMMIT_MSG%
 git commit -m %COMMIT_MSG%
 
+:: Create ZIP Release
+set ZIP_NAME=KH-Tools_v%VERSION%.zip
+echo [KH-Tools] Creating ZIP Release: %ZIP_NAME%...
+
+:: Delete old zip if exists
+if exist "%ZIP_NAME%" del "%ZIP_NAME%"
+
+:: Use PowerShell to zip files excluding git and dev files
+powershell -Command "Get-ChildItem -Path . -Exclude '.git','.gitignore','deploy.bat','%ZIP_NAME%','README.md','*.blend1','*.pyc' | Compress-Archive -DestinationPath '%ZIP_NAME%' -Force"
+
+echo [KH-Tools] ZIP Created successfully!
+
 :: Push
 echo [KH-Tools] Pushing to %BRANCH%...
 git branch -M %BRANCH%
 git push -u origin %BRANCH%
 
-echo [KH-Tools] Deployment Complete!
+echo.
+echo ==========================================
+echo [DONE] Version %VERSION% Pushed to GitHub
+echo [FILE] %ZIP_NAME% is ready for release!
+echo ==========================================
 pause

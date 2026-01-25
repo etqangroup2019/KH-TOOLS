@@ -45,6 +45,3 @@ KH-Tools is a comprehensive productivity suite for Blender designed to streamlin
 3. Select the ZIP file.
 4. Enable `KH-Tools` from the list.
 
-## Deployment
-Use the provided `deploy.bat` to push updates directly to the GitHub repository:
-`https://github.com/etqangroup2019/KH-TOOLS.git`
