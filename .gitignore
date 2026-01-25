@@ -16,3 +16,6 @@ Thumbs.db
 # Addon specific temporary files
 *.log
 temp/
+
+# Deployment scripts
+deploy.bat
