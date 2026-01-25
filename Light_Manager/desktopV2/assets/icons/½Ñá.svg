@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256px" height="256px" viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet">
+  <rect x="0" y="0" width="256" height="256" rx="8" fill="#ffffff"/>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" fill="#ffffff" x="0" y="0" width="256" height="256">
+    <path fill="#ffffff" fill-rule="evenodd" d="M3.5 0A3.5 3.5 0 0 0 0 3.5v7A3.5 3.5 0 0 0 3.5 14h7a3.5 3.5 0 0 0 3.5-3.5v-7A3.5 3.5 0 0 0 10.5 0zM4 6.25a.75.75 0 0 0 0 1.5h6a.75.75 0 0 0 0-1.5z" clip-rule="evenodd"/>
+  </svg>
+</svg>
