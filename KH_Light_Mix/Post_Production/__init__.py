@@ -1189,48 +1189,51 @@ class Post_Productions_IMAGE_EDITOR_Panel(bpy.types.Panel):
                                         inner_box = box.box()
                                         
                                         if current_tab == 'MAIN':
-                                            if bpy.app.version >= (5, 0, 0):
-                                                gt_input = get_glare_input(g_node, 'Glare Type', 1)
-                                                if gt_input:
-                                                    inner_box.prop(gt_input, "default_value", text="Type")
+                                            #if bpy.app.version >= (5, 0, 0):
+                                            if bpy.app.version >= (4, 4, 0):
+                                                # if len(g_node.inputs) > 1:
+                                                #     inner_box.prop(g_node.inputs[1], "default_value", text="Glare Type")
                                                 if 'Quality' in g_node.inputs:
                                                     inner_box.prop(g_node.inputs['Quality'], "default_value", text="Quality")
-                                                if 'Mix' in g_node.inputs:
-                                                    inner_box.prop(g_node.inputs['Mix'], "default_value", text="Mix", slider=True)
+                                                else:
+                                                    inner_box.prop(g_node, "quality")
                                             else:
-                                                inner_box.prop(g_node, "glare_type")
+                                                #inner_box.prop(g_node, "glare_type")
                                                 inner_box.prop(g_node, "quality")
                                                 inner_box.prop(g_node, "mix", slider=True)
-                                                
-                                        elif current_tab == 'HIGHLIGHTS':
-                                            if bpy.app.version >= (5, 0, 0):
-                                                threshold_input = get_glare_input(g_node, 'Threshold', 3)
-                                                if threshold_input: inner_box.prop(threshold_input, "default_value", text="Threshold")
-                                                smoothness_input = get_glare_input(g_node, 'Smoothness', 4)
-                                                if smoothness_input: inner_box.prop(smoothness_input, "default_value", text="Smoothness", slider=True)
-                                                clamp_input = get_glare_input(g_node, 'Clamp', 5)
-                                                if clamp_input: inner_box.prop(clamp_input, "default_value", text="Clamp")
-                                                maximum_input = get_glare_input(g_node, 'Maximum', 6)
-                                                if maximum_input: inner_box.prop(maximum_input, "default_value", text="Maximum")
-                                            else:
-                                                inner_box.prop(g_node, "threshold")
-                                                
-                                        elif current_tab == 'ADJUST':
-                                            if bpy.app.version >= (5, 0, 0):
+                                                inner_box.prop(g_node, "threshold", slider=True)
+
+                                            
+                                            if bpy.app.version >= (4, 4, 0):
+                                                #ADJUST
                                                 strength_input = get_glare_input(g_node, 'Strength', 7)
                                                 if strength_input: inner_box.prop(strength_input, "default_value", text="Strength", slider=True)
                                                 saturation_input = get_glare_input(g_node, 'Saturation', 8)
                                                 if saturation_input: inner_box.prop(saturation_input, "default_value", text="Saturation", slider=True)
                                                 tint_input = get_glare_input(g_node, 'Tint', 9)
-                                                if tint_input: inner_box.prop(tint_input, "default_value", text="Tint")
-                                            else:
-                                                inner_box.label(text="Adjust: Standard property in 5.0")
-
+                                                if tint_input: inner_box.prop(tint_input, "default_value", text="")
+                                        
                                         elif current_tab == 'GLARE':
-                                            if bpy.app.version >= (5, 0, 0):
-                                                g_mode = g_node.inputs[1].default_value if len(g_node.inputs) > 1 else "None"
+                                            if bpy.app.version >= (4, 4, 0):
+
+                                                #HIGHLIGHTS
+                                                threshold_input = get_glare_input(g_node, 'Threshold', 3)
+                                                if threshold_input: inner_box.prop(threshold_input, "default_value", text="Threshold")
+                                                smoothness_input = get_glare_input(g_node, 'Smoothness', 4)
+                                                if smoothness_input: inner_box.prop(smoothness_input, "default_value", text="Smoothness", slider=True)
+                                                # clamp_input = get_glare_input(g_node, 'Clamp', 5)
+                                                # if clamp_input: inner_box.prop(clamp_input, "default_value", text="Clamp")
+                                                # maximum_input = get_glare_input(g_node, 'Maximum', 6)
+                                                # if maximum_input: inner_box.prop(maximum_input, "default_value", text="Maximum")
+
+                                                #GLARE
+                                                if bpy.app.version >= (5, 0, 0):
+                                                    g_mode = g_node.inputs[1].default_value if len(g_node.inputs) > 1 else "None"
+                                                else:
+                                                    g_mode = g_node.glare_type
                                                 
-                                                if g_mode in ['Bloom', 'Fog Glow', 'Sun Beams']:
+                                                
+                                                if g_mode in ['Bloom', 'Fog Glow', 'Sun Beams'] or g_mode in ['BLOOM', 'FOG_GLOW']:
                                                     size_input = get_glare_input(g_node, 'Size', 15)
                                                     if size_input: inner_box.prop(size_input, "default_value", text="Size", slider=True)
                                                 
@@ -1240,11 +1243,11 @@ class Post_Productions_IMAGE_EDITOR_Panel(bpy.types.Panel):
                                                     # k_val = get_glare_input(g_node, 'Kernel', 21)
                                                     # if k_val: inner_box.prop(k_val, "default_value", text="Kernel")
 
-                                                if g_mode in ['Ghosts', 'Streaks', 'Simple Star']:
+                                                if g_mode in ['Ghosts', 'Streaks', 'Simple Star'] or g_mode in ['GHOSTS', 'STREAKS', 'SIMPLE_STAR']:
                                                     iter_input = get_glare_input(g_node, 'Iterations', 12)
                                                     if iter_input: inner_box.prop(iter_input, "default_value", text="Iterations")
                                                 
-                                                if g_mode in ['Streaks', 'Simple Star']:
+                                                if g_mode in ['Streaks', 'Simple Star'] or g_mode in ['STREAKS', 'SIMPLE_STAR']:
                                                     fade_input = get_glare_input(g_node, 'Fade', 14)
                                                     if fade_input: inner_box.prop(fade_input, "default_value", text="Fade", slider=True)
                                             
@@ -1253,24 +1256,79 @@ class Post_Productions_IMAGE_EDITOR_Panel(bpy.types.Panel):
                                                     if sun_pos: inner_box.prop(sun_pos, "default_value", text="Sun Position")
                                                     jitter = get_glare_input(g_node, 'Jitter', 18)
                                                     if jitter: inner_box.prop(jitter, "default_value", text="Jitter", slider=True)
-                                                    
-                                                if g_mode in ['Streaks', 'Ghosts']:
+
+                                                if g_mode in ['Streaks', 'Ghosts'] or g_mode in ['STREAKS', 'GHOSTS']:
                                                     cmod_input = get_glare_input(g_node, 'Color Modulation', 11)
                                                     if cmod_input: inner_box.prop(cmod_input, "default_value", text="Color Modulation", slider=True)
                                                     
-                                                if g_mode == 'Streaks':
+                                                if g_mode == 'Streaks' or g_mode == 'STREAKS':
                                                     streaks_in = get_glare_input(g_node, 'Streaks', 13)
                                                     if streaks_in: inner_box.prop(streaks_in, "default_value", text="Streaks")
                                                     angle_in = get_glare_input(g_node, 'Streaks Angle', 16)
                                                     if angle_in: inner_box.prop(angle_in, "default_value", text="Streaks Angle")
 
-                                                if g_mode == 'Simple Star':
-                                                    diag_input = get_glare_input(g_node, 'Diagonal', 19)
-                                                    if diag_input: inner_box.prop(diag_input, "default_value", text="Diagonal")
+                                                if g_mode == 'Simple Star' or g_mode == 'SIMPLE_STAR':
+                                                    if bpy.app.version >= (5, 0, 0):
+                                                        diag_input = get_glare_input(g_node, 'Diagonal', 19)
+                                                        if diag_input: inner_box.prop(diag_input, "default_value", text="Rotate 45")
+                                                    else:
+                                                        if hasattr(g_node, 'use_rotate_45'): inner_box.prop(g_node, "use_rotate_45")
+                                                                                
                                             else:
-                                                if hasattr(g_node, 'size'): inner_box.prop(g_node, "size")
-                                                if hasattr(g_node, 'iterations'): inner_box.prop(g_node, "iterations")
+                                                g_mode = g_node.glare_type
 
+                                                if g_mode in ['BLOOM', 'FOG_GLOW']:
+                                                    if hasattr(g_node, 'size'): inner_box.prop(g_node, "size")
+                                                
+                                                if  g_mode in ['GHOSTS', 'STREAKS', 'SIMPLE_STAR']:
+                                                    if hasattr(g_node, 'iterations'): inner_box.prop(g_node, "iterations")
+                                                
+                                                if g_mode in ['STREAKS', 'SIMPLE_STAR']:
+                                                    if hasattr(g_node, 'fade'): inner_box.prop(g_node, "fade")
+                                            
+                                                if g_mode in ['STREAKS', 'GHOSTS']:
+                                                    if hasattr(g_node, 'color_modulation'): inner_box.prop(g_node, "color_modulation")
+                                                    
+                                                if g_mode == 'STREAKS':
+                                                    if hasattr(g_node, 'streaks'): inner_box.prop(g_node, "streaks")
+                                                    if hasattr(g_node, 'angle_offset'): inner_box.prop(g_node, "angle_offset")
+                                                    
+                                                if g_mode == 'SIMPLE_STAR':
+                                                    if hasattr(g_node, 'use_rotate_45'): inner_box.prop(g_node, "use_rotate_45")
+
+
+                                        # if current_tab == 'HIGHLIGHTS' :
+                                        #     if bpy.app.version >= (4, 4, 0):
+                                        #         threshold_input = get_glare_input(g_node, 'Threshold', 3)
+                                        #         if threshold_input: inner_box.prop(threshold_input, "default_value", text="Threshold")
+                                        #         smoothness_input = get_glare_input(g_node, 'Smoothness', 4)
+                                        #         if smoothness_input: inner_box.prop(smoothness_input, "default_value", text="Smoothness", slider=True)
+                                        #         clamp_input = get_glare_input(g_node, 'Clamp', 5)
+                                        #         if clamp_input: inner_box.prop(clamp_input, "default_value", text="Clamp")
+                                        #         maximum_input = get_glare_input(g_node, 'Maximum', 6)
+                                        #         if maximum_input: inner_box.prop(maximum_input, "default_value", text="Maximum")
+                                        #     # else:
+                                        #     #     inner_box.prop(g_node, "threshold")
+                                        #     #     inner_box.prop(g_node, "smoothness", slider=True)
+                                        #     #     inner_box.prop(g_node, "maximum")
+                                                
+                                        # elif current_tab == 'ADJUST':
+                                        #     if bpy.app.version >= (4, 4, 0):
+                                        #         strength_input = get_glare_input(g_node, 'Strength', 7)
+                                        #         if strength_input: inner_box.prop(strength_input, "default_value", text="Strength", slider=True)
+                                        #         saturation_input = get_glare_input(g_node, 'Saturation', 8)
+                                        #         if saturation_input: inner_box.prop(saturation_input, "default_value", text="Saturation", slider=True)
+                                        #         tint_input = get_glare_input(g_node, 'Tint', 9)
+                                        #         if tint_input: inner_box.prop(tint_input, "default_value", text="Tint")
+                                            #else:
+                                                # strength_input = get_glare_input(g_node, 'Strength', 7)
+                                                # if strength_input: inner_box.prop(strength_input, "default_value", text="Strength", slider=True)
+                                                # saturation_input = get_glare_input(g_node, 'Saturation', 8)
+                                                # if saturation_input: inner_box.prop(saturation_input, "default_value", text="Saturation", slider=True)
+                                                # tint_input = get_glare_input(g_node, 'Tint', 9)
+                                                # if tint_input: inner_box.prop(tint_input, "default_value", text="Tint")
+
+                                    
                                         
 
 

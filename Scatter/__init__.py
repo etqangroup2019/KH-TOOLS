@@ -960,7 +960,10 @@ class kh_scatter_particle_asset_library(bpy.types.Operator):
         particle_system.settings.phase_factor_random = 2.0 # Add some random rotation by default
         particle_system.settings.use_rotation_instance = True
         particle_system.seed = random.randint(1, 1000)  
-        particle_system.settings.count = 1
+        particle_system.settings.count = 10
+        particle_system.settings.child_percent = 1
+        particle_system.settings.rendered_child_count = 1
+
      
         
         # 7. Cleanup and Refresh
@@ -1230,6 +1233,7 @@ class kh_scatter_Panel(bpy.types.Panel):
                         bottom_panel.prop(selected_ps.settings, "size_random", text="S-Random")
                         bottom_panel.prop(selected_ps.settings, "phase_factor_random", text="R-Random")
                         bottom_panel.prop(selected_ps, "seed", text="Seed")
+                        bottom_panel.prop(selected_ps.settings, "use_rotation_instance", text="Rotation")
 
                 elif selected_type == 'MOD':
                     mod_name = context.scene.selected_scatter_modifier

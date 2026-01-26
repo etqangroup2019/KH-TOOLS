@@ -2,7 +2,7 @@ bl_info = {
     "name": "KH-Tools",
     "author": "Khaled Alnwesary",
     "version": (1, 99),
-    "blender": (4, 3, 0),
+    "blender": (4, 2, 0),
     "location": "View3D > UI",
     "description": "",
     "warning": "",
@@ -92,7 +92,9 @@ from .sketcup_import import *
 from .Random_Asset import *
 from .update import *
 from .select_linked_pick import *
-from . import skp_drag_drop
+
+if bpy.app.version >= (4, 2, 0):
+    from . import skp_drag_drop
 
 class SketchupAddonPreferences_k(AddonPreferences):
 
@@ -452,7 +454,8 @@ def register():
     Top_View.register()
     Random_Asset.register()
     select_linked_pick.register()
-    skp_drag_drop.register()
+    if bpy.app.version >= (4, 2, 0):
+        skp_drag_drop.register()
 
 def unregister():
     for i in classes:
@@ -471,7 +474,9 @@ def unregister():
     Top_View.unregister()
     Random_Asset.unregister()
     select_linked_pick.unregister()
-    skp_drag_drop.unregister()
+
+    if bpy.app.version >= (4, 2, 0):
+        skp_drag_drop.unregister()
 
 if __name__ == "__main__":
     try:

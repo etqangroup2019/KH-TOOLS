@@ -1,12 +1,12 @@
-# Progress Window for SketchUp Import
 import ctypes
 import threading
 import time
 import queue
+from ctypes import wintypes
 
 # Windows Types
-WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_longlong, ctypes.c_void_p, ctypes.c_uint, 
-                              ctypes.c_ulonglong, ctypes.c_longlong)
+WNDPROC = ctypes.WINFUNCTYPE(wintypes.LPARAM, wintypes.HWND, wintypes.UINT, 
+                              wintypes.WPARAM, wintypes.LPARAM)
 
 class WNDCLASSEXW(ctypes.Structure):
     _fields_ = [
@@ -39,6 +39,103 @@ class MSG(ctypes.Structure):
 user32 = ctypes.windll.user32
 kernel32 = ctypes.windll.kernel32
 gdi32 = ctypes.windll.gdi32
+
+# Define WinAPI functions for 64-bit compatibility
+user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+user32.DefWindowProcW.restype = wintypes.LPARAM
+
+user32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.DWORD, 
+                                   wintypes.INT, wintypes.INT, wintypes.INT, wintypes.INT, 
+                                   wintypes.HWND, wintypes.HMENU, wintypes.HANDLE, wintypes.LPVOID]
+user32.CreateWindowExW.restype = wintypes.HWND
+
+user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, ctypes.c_void_p, ctypes.c_void_p]
+user32.SendMessageW.restype = ctypes.c_void_p
+
+user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, ctypes.c_void_p, ctypes.c_void_p]
+user32.PostMessageW.restype = wintypes.BOOL
+
+user32.GetMessageW.argtypes = [ctypes.POINTER(MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT]
+user32.GetMessageW.restype = wintypes.BOOL
+
+user32.PeekMessageW.argtypes = [ctypes.POINTER(MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT, wintypes.UINT]
+user32.PeekMessageW.restype = wintypes.BOOL
+
+user32.DispatchMessageW.argtypes = [ctypes.POINTER(MSG)]
+user32.DispatchMessageW.restype = wintypes.LPARAM
+
+user32.TranslateMessage.argtypes = [ctypes.POINTER(MSG)]
+user32.TranslateMessage.restype = wintypes.BOOL
+
+user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+user32.GetWindowTextLengthW.restype = wintypes.INT
+
+user32.SetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPCWSTR]
+user32.SetWindowTextW.restype = wintypes.BOOL
+
+user32.ShowWindow.argtypes = [wintypes.HWND, wintypes.INT]
+user32.ShowWindow.restype = wintypes.BOOL
+
+user32.UpdateWindow.argtypes = [wintypes.HWND]
+user32.UpdateWindow.restype = wintypes.BOOL
+
+user32.DestroyWindow.argtypes = [wintypes.HWND]
+user32.DestroyWindow.restype = wintypes.BOOL
+
+user32.RegisterClassExW.argtypes = [ctypes.c_void_p]
+user32.RegisterClassExW.restype = wintypes.ATOM
+
+user32.UnregisterClassW.argtypes = [wintypes.LPCWSTR, wintypes.HINSTANCE]
+user32.UnregisterClassW.restype = wintypes.BOOL
+
+user32.SetFocus.argtypes = [wintypes.HWND]
+user32.SetFocus.restype = wintypes.HWND
+
+user32.GetSystemMetrics.argtypes = [wintypes.INT]
+user32.GetSystemMetrics.restype = wintypes.INT
+
+gdi32.CreateFontW.argtypes = [wintypes.INT, wintypes.INT, wintypes.INT, wintypes.INT, wintypes.INT, 
+                              wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, 
+                              wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, 
+                              wintypes.LPCWSTR]
+gdi32.CreateFontW.restype = wintypes.HANDLE
+
+gdi32.DeleteObject.argtypes = [wintypes.HANDLE]
+gdi32.DeleteObject.restype = wintypes.BOOL
+
+user32.LoadCursorW.argtypes = [wintypes.HINSTANCE, ctypes.c_void_p]
+user32.LoadCursorW.restype = wintypes.HANDLE
+
+try:
+    comctl32 = ctypes.windll.comctl32
+    comctl32.InitCommonControlsEx.argtypes = [ctypes.c_void_p]
+    comctl32.InitCommonControlsEx.restype = wintypes.BOOL
+except:
+    pass
+
+kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+kernel32.GetModuleHandleW.restype = wintypes.HINSTANCE
+
+kernel32.GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
+kernel32.GlobalAlloc.restype = wintypes.HGLOBAL
+
+kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+kernel32.GlobalLock.restype = wintypes.LPVOID
+
+kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+kernel32.GlobalUnlock.restype = wintypes.BOOL
+
+user32.OpenClipboard.argtypes = [wintypes.HWND]
+user32.OpenClipboard.restype = wintypes.BOOL
+
+user32.EmptyClipboard.argtypes = []
+user32.EmptyClipboard.restype = wintypes.BOOL
+
+user32.SetClipboardData.argtypes = [wintypes.UINT, wintypes.HANDLE]
+user32.SetClipboardData.restype = wintypes.HANDLE
+
+user32.CloseClipboard.argtypes = []
+user32.CloseClipboard.restype = wintypes.BOOL
 
 # Initialize Common Controls
 try:
@@ -243,15 +340,17 @@ class ProgressWindow:
         # Log updates
         while not self.message_queue.empty():
             try:
-                msg = self.message_queue.get_nowait()
+                msg = str(self.message_queue.get_nowait())
                 self.log_text += msg + "\r\n"
                 if self.hwnd_log:
-                    length = user32.GetWindowTextLengthW(self.hwnd_log)
-                    user32.SendMessageW(self.hwnd_log, 0x00B1, length, length)  # EM_SETSEL
-                    user32.SendMessageW(self.hwnd_log, 0x00C2, 0, msg + "\r\n")  # EM_REPLACESEL
+                    user32.SetWindowTextW(self.hwnd_log, self.log_text)
+                    user32.UpdateWindow(self.hwnd_log)
+                    # Scroll to end: EM_SETSEL with -1, -1 then EM_SCROLLCARET
+                    # 0xFFFFFFFFFFFFFFFF is -1 for 64-bit unsigned WPARAM/LPARAM
+                    user32.SendMessageW(self.hwnd_log, 0x00B1, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF)
                     user32.SendMessageW(self.hwnd_log, 0x00B7, 0, 0)  # EM_SCROLLCARET
-            except:
-                pass
+            except Exception as e:
+                print(f"SKP | Log update error: {e}")
     
     def _copy_log(self):
         try:

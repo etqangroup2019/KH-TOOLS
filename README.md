@@ -2,7 +2,7 @@
 
 **Author:** Khaled Alnwesary  
 **Version:** 1.99  
-**Blender Compatibility:** 4.3.0+  
+**Blender Compatibility:** 4.2.0+  
 
 ## Overview
 KH-Tools is a comprehensive productivity suite for Blender designed to streamline the workflow for architectural visualization, environment design, and general 3D creation. It integrates multiple specialized managers and tools into a single, cohesive interface.

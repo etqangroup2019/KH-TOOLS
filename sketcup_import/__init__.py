@@ -538,7 +538,7 @@ class SceneImporter():
                 skp_log(e)
             if progress_win:
                 progress_win.log_message(f"Error reading file: {e}")
-                close_progress()
+                show_finished_in_progress(f"Error: {e}")
             return {'FINISHED'}
         
         # Start stopwatch for camera import
@@ -655,9 +655,8 @@ class SceneImporter():
                     l.exclude = True  # hide component collection in view layer
         if options['dedub_only']:
             if progress_win:
-                progress_win.update_progress(100, "Import completed")
-                progress_win.log_message("Groups import completed")
-                close_progress()
+                progress_win.update_progress(100, "Import completed!")
+                show_finished_in_progress("Groups import completed successfully!")
             return {'FINISHED'}
 
         # Start stopwatch for mesh objects import
@@ -783,11 +782,11 @@ class SceneImporter():
         else :
             print("File 'components Not imported.txt' is not present.")
         
-        # إغلاق نافذة التقدم
+        # إظهار رسالة الانتهاء في نافذة التقدم
         if progress_win:
             progress_win.update_progress(100, "Import completed!")
             progress_win.log_message("Import process finished successfully")
-            close_progress()
+            show_finished_in_progress("SKP file imported successfully!")
         
         self.FenceCollection()    
         return {'FINISHED'}
@@ -1617,7 +1616,7 @@ class SceneImporterupdate():
             skp_log(e)
             if progress_win:
                 progress_win.log_message(f"Error reading file: {e}")
-                close_progress()
+                show_finished_in_progress(f"Error: {e}")
             return {'FINISHED'}
 
         if options['import_scene']:
@@ -1689,7 +1688,8 @@ class SceneImporterupdate():
         if options["dedub_only"]:
             if progress_win:
                 progress_win.update_progress(100, "Update completed")
-                close_progress()
+                progress_win.log_message("Update completed successfully")
+                show_finished_in_progress("Update completed successfully!")
             return {'FINISHED'}
         
         _time_mesh_data = time.time()
@@ -1815,11 +1815,11 @@ class SceneImporterupdate():
         else :
             print("File 'components Not imported.txt' is not present.")
         
-        # إغلاق نافذة التقدم
+        # إظهار رسالة الانتهاء في نافذة التقدم
         if progress_win:
             progress_win.update_progress(100, "Update completed!")
             progress_win.log_message("Update process finished successfully")
-            close_progress()
+            show_finished_in_progress("SKP file updated successfully!")
             
         self.FenceCollection()        
         return {'FINISHED'}
@@ -3231,7 +3231,8 @@ class SKPN(bpy.types.Operator):
         Material_diffuse_color()
         skp_Master_to_SKP_Master()
         skp_name_to_SKP()
-        bpy.ops.wm.save_mainfile()
+        if bpy.data.filepath:
+            bpy.ops.wm.save_mainfile()
         return None  # إيقاف المؤقت
 
         
