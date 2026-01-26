@@ -10,12 +10,12 @@
 **Version:** 1.99 
 **Blender Compatibility:** 4.0.0+ 
 
+### Overview
+KH-Tools is a comprehensive productivity suite for Blender designed to streamline the workflow for architectural visualization, environment design, and general 3D creation. It integrates multiple specialized managers and tools into a single, cohesive interface.
+
 ### 🆕 New Features
 - **Blender 5.0 Support**: Fully optimized and tested for Blender 5.0, including UI enhancements and API compatibility.
 - **Improved Performance**: Faster loading times and more efficient memory management.
-
-### Overview
-KH-Tools is a comprehensive productivity suite for Blender designed to streamline the workflow for architectural visualization, environment design, and general 3D creation. It integrates multiple specialized managers and tools into a single, cohesive interface.
 
 ### Main Features
 
@@ -63,12 +63,12 @@ KH-Tools is a comprehensive productivity suite for Blender designed to streamlin
 **الإصدار:** 1.99  
 **متوافق مع بلندر:** 4.0.0+ 
 
+### نظرة عامة
+تعتبر أدوات KH حزمة إنتاجية شاملة لبلندر، مصممة لتبسيط سير العمل في التصور المعماري، وتصميم البيئات، والإنشاء ثلاثي الأبعاد بشكل عام. تدمج هذه الحزمة العديد من الأدوات والمديرين المتخصصين في واجهة واحدة متماسكة.
+
 ### 🆕 المميزات الجديدة
 - **دعم بلندر 5.0**: تم تحسينه واختباره بالكامل ليعمل مع بلندر 5.0، بما في ذلك تحسينات الواجهة وتوافق الـ API.
 - **تحسين الأداء**: سرعة أكبر في التحميل وإدارة أكثر كفاءة لذاكرة البرنامج.
-
-### نظرة عامة
-تعتبر أدوات KH حزمة إنتاجية شاملة لبلندر، مصممة لتبسيط سير العمل في التصور المعماري، وتصميم البيئات، والإنشاء ثلاثي الأبعاد بشكل عام. تدمج هذه الحزمة العديد من الأدوات والمديرين المتخصصين في واجهة واحدة متماسكة.
 
 ### المميزات الرئيسية
 
