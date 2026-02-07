@@ -50,7 +50,7 @@ KH-Tools is a comprehensive productivity suite for Blender designed to streamlin
 - Material management and quick assignment tools.
 
 ### Download
-https://github.com/etqangroup2019/KH-TOOLS/archive/refs/heads/main.zip
+https://www.youtube.com
 
 ### Installation
 1. Download the repository as a ZIP.
