@@ -106,7 +106,7 @@ https://github.com/etqangroup2019/KH-TOOLS/archive/refs/heads/main.zip
 - أدوات إدارة المواد والتعيين السريع.
 
 ### رابط التحميل
-https://github.com/etqangroup2019/KH-TOOLS/archive/refs/heads/main.zip
+https://www.youtube.com
 
 ### التثبيت
 1. قم بتحميل المستودع بصيغة ZIP.
