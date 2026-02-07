@@ -158,6 +158,7 @@ class ProgressWindow:
         self.hwnd_status = None
         self.hwnd_log = None
         self.hwnd_ok_btn = None
+        self.hwnd_cancel_btn = None
         self.is_running = False
         self.message_queue = queue.Queue()
         self.progress_queue = queue.Queue()
@@ -166,7 +167,9 @@ class ProgressWindow:
         self._wndproc = None
         self.hfont = None
         self._finished = False
+        self._cancelled = False
         self._on_ok_callback = None
+        self._on_cancel_callback = None
         
     def start(self):
         self.is_running = True
@@ -184,7 +187,9 @@ class ProgressWindow:
             def wndproc(hwnd, msg, wparam, lparam):
                 if msg == 0x0010:  # WM_CLOSE
                     if not self._finished:
-                        return 0
+                        # السماح بالإغلاق أثناء العملية (إلغاء)
+                        self._cancelled = True
+                        self.log_message("Operation cancelled by user")
                     self.is_running = False
                     user32.DestroyWindow(hwnd)
                     return 0
@@ -200,9 +205,16 @@ class ProgressWindow:
                             self._on_ok_callback()
                         self.is_running = False
                         user32.DestroyWindow(hwnd)
+                    elif cmd == 1003:
+                        # زر Cancel
+                        self._cancelled = True
+                        self.log_message("Cancelling operation...")
+                        if self._on_cancel_callback:
+                            self._on_cancel_callback()
                     return 0
                 return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
             
+            self._wndproc = WNDPROC(wndproc)
             self._wndproc = WNDPROC(wndproc)
             
             # Register class
@@ -291,7 +303,16 @@ class ProgressWindow:
             )
             user32.SendMessageW(btn_copy, 0x30, self.hfont, 1)
             
-            # OK button (hidden)
+            # Cancel button (visible during operation)
+            self.hwnd_cancel_btn = user32.CreateWindowExW(
+                0, "BUTTON", "Cancel",
+                0x50000000,  # WS_CHILD | WS_VISIBLE
+                310, 405, 130, 38,
+                self.hwnd, 1003, hInstance, None
+            )
+            user32.SendMessageW(self.hwnd_cancel_btn, 0x30, self.hfont, 1)
+            
+            # OK button (hidden initially)
             self.hwnd_ok_btn = user32.CreateWindowExW(
                 0, "BUTTON", "OK",
                 0x40000001,  # WS_CHILD | BS_DEFPUSHBUTTON (hidden)
@@ -387,9 +408,17 @@ class ProgressWindow:
         self.log_message("=" * 45)
         self.log_message(f"COMPLETED: {message}")
         self.log_message("=" * 45)
+        
+        # إخفاء زر Cancel وإظهار زر OK
+        if self.hwnd_cancel_btn:
+            user32.ShowWindow(self.hwnd_cancel_btn, 0)  # SW_HIDE
         if self.hwnd_ok_btn:
             user32.ShowWindow(self.hwnd_ok_btn, 5)  # SW_SHOW
             user32.SetFocus(self.hwnd_ok_btn)
+    
+    def is_cancelled(self):
+        """التحقق من إلغاء العملية"""
+        return self._cancelled
             
     def close(self):
         self._finished = True
@@ -459,12 +488,12 @@ class ConfirmDialog:
             
             sw = user32.GetSystemMetrics(0)
             sh = user32.GetSystemMetrics(1)
-            ww, wh = 450, 180
+            ww, wh = 550, 250
             
             hwnd = user32.CreateWindowExW(
                 0x00000008,  # WS_EX_TOPMOST
                 class_name, self.title,
-                0x10C80000,  # WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+                0x10CA0000,  # WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
                 (sw-ww)//2, (sh-wh)//2, ww, wh,
                 None, None, hInstance, None
             )
@@ -475,17 +504,17 @@ class ConfirmDialog:
             lbl = user32.CreateWindowExW(
                 0, "STATIC", self.message,
                 0x50000000,
-                25, 20, 390, 70,
+                25, 20, 490, 120,
                 hwnd, None, hInstance, None
             )
             user32.SendMessageW(lbl, 0x30, hfont, 1)
             
             # OK button
-            bx = 130 if self.show_cancel else 175
+            bx = 160 if self.show_cancel else 225
             btn_ok = user32.CreateWindowExW(
                 0, "BUTTON", "OK",
                 0x50000001,  # WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON
-                bx, 100, 100, 35,
+                bx, 160, 100, 38,
                 hwnd, 1, hInstance, None
             )
             user32.SendMessageW(btn_ok, 0x30, hfont, 1)
@@ -495,7 +524,7 @@ class ConfirmDialog:
                 btn_cancel = user32.CreateWindowExW(
                     0, "BUTTON", "Cancel",
                     0x50000000,
-                    240, 100, 100, 35,
+                    280, 160, 100, 38,
                     hwnd, 2, hInstance, None
                 )
                 user32.SendMessageW(btn_cancel, 0x30, hfont, 1)
@@ -513,6 +542,145 @@ class ConfirmDialog:
         except Exception as e:
             print(f"SKP | Dialog error: {e}")
             self._result = False
+            self._done.set()
+
+
+class SkippedComponentsDialog:
+    def __init__(self, skipped_components):
+        self.skipped_components = skipped_components
+        self._wndproc = None
+        self._done = threading.Event()
+        
+    def show(self):
+        self._done.clear()
+        t = threading.Thread(target=self._create, daemon=True)
+        t.start()
+        self._done.wait(timeout=300)
+    
+    def _create(self):
+        try:
+            hInstance = kernel32.GetModuleHandleW(None)
+            
+            def wndproc(hwnd, msg, wparam, lparam):
+                if msg == 0x0010:  # WM_CLOSE
+                    self._done.set()
+                    user32.DestroyWindow(hwnd)
+                    return 0
+                elif msg == 0x0002:  # WM_DESTROY
+                    user32.PostQuitMessage(0)
+                    return 0
+                elif msg == 0x0111:  # WM_COMMAND
+                    cmd = wparam & 0xFFFF
+                    if cmd == 1:  # OK button
+                        self._done.set()
+                        user32.DestroyWindow(hwnd)
+                    return 0
+                return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+            
+            self._wndproc = WNDPROC(wndproc)
+            
+            class_name = f"SKPSkipped_{id(self)}"
+            wc = WNDCLASSEXW()
+            wc.cbSize = ctypes.sizeof(WNDCLASSEXW)
+            wc.style = 3
+            wc.lpfnWndProc = self._wndproc
+            wc.hInstance = hInstance
+            wc.hCursor = user32.LoadCursorW(None, 32512)
+            wc.hbrBackground = ctypes.c_void_p(16)
+            wc.lpszClassName = class_name
+            user32.RegisterClassExW(ctypes.byref(wc))
+            
+            sw = user32.GetSystemMetrics(0)
+            sh = user32.GetSystemMetrics(1)
+            ww, wh = 650, 580
+            
+            hwnd = user32.CreateWindowExW(
+                0x00000008,  # WS_EX_TOPMOST
+                class_name, "Skipped Components",
+                0x10CA0000,  # WS_VISIBLE | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+                (sw-ww)//2, (sh-wh)//2, ww, wh,
+                None, None, hInstance, None
+            )
+            
+            hfont = gdi32.CreateFontW(-15, 0, 0, 0, 400, 0, 0, 0, 0, 0, 0, 0, 0, "Segoe UI")
+            hfont_bold = gdi32.CreateFontW(-16, 0, 0, 0, 700, 0, 0, 0, 0, 0, 0, 0, 0, "Segoe UI")
+            
+            # Title message
+            lbl_title = user32.CreateWindowExW(
+                0, "STATIC", f"Warning: {len(self.skipped_components)} component(s) were skipped during import",
+                0x50000000,
+                20, 20, 600, 25,
+                hwnd, None, hInstance, None
+            )
+            user32.SendMessageW(lbl_title, 0x30, hfont_bold, 1)
+            
+            # Components list label
+            lbl_list = user32.CreateWindowExW(
+                0, "STATIC", "Skipped Components:",
+                0x50000000,
+                20, 55, 600, 20,
+                hwnd, None, hInstance, None
+            )
+            user32.SendMessageW(lbl_list, 0x30, hfont, 1)
+            
+            # List of skipped components (scrollable)
+            components_text = "\r\n".join([comp for comp in self.skipped_components])
+            hwnd_list = user32.CreateWindowExW(
+                0x200,  # WS_EX_CLIENTEDGE
+                "EDIT", components_text,
+                0x50200844,  # WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+                20, 80, 600, 200,
+                hwnd, None, hInstance, None
+            )
+            user32.SendMessageW(hwnd_list, 0x30, hfont, 1)
+            
+            # Solution steps label
+            lbl_solution = user32.CreateWindowExW(
+                0, "STATIC", "Solution Steps:",
+                0x50000000,
+                20, 295, 600, 20,
+                hwnd, None, hInstance, None
+            )
+            user32.SendMessageW(lbl_solution, 0x30, hfont_bold, 1)
+            
+            # Solution steps text
+            solution_text = (
+                "1. Open the SketchUp file\r\n\r\n"
+                "2. Search for the component name in the Outliner panel\r\n\r\n"
+                "3. Select the skipped component(s) from the list\r\n\r\n"
+                "4. Right-click and choose 'Explode' to convert them to groups or geometry\r\n\r\n"
+                "5. Save the file and re-import to Blender"
+            )
+            hwnd_solution = user32.CreateWindowExW(
+                0x200,  # WS_EX_CLIENTEDGE
+                "EDIT", solution_text,
+                0x50200844,  # WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY
+                20, 320, 600, 180,
+                hwnd, None, hInstance, None
+            )
+            user32.SendMessageW(hwnd_solution, 0x30, hfont, 1)
+            
+            # OK button (على اليمين)
+            btn_ok = user32.CreateWindowExW(
+                0, "BUTTON", "OK",
+                0x50000001,  # WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON
+                510, 515, 100, 38,
+                hwnd, 1, hInstance, None
+            )
+            user32.SendMessageW(btn_ok, 0x30, hfont, 1)
+            user32.SetFocus(btn_ok)
+            
+            msg = MSG()
+            while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+                user32.TranslateMessage(ctypes.byref(msg))
+                user32.DispatchMessageW(ctypes.byref(msg))
+            
+            user32.UnregisterClassW(class_name, hInstance)
+            gdi32.DeleteObject(hfont)
+            gdi32.DeleteObject(hfont_bold)
+            
+        except Exception as e:
+            print(f"SKP | Skipped components dialog error: {e}")
             self._done.set()
 
 
@@ -541,6 +709,13 @@ def get_current_progress():
     global _current_window
     return _current_window
 
+def is_operation_cancelled():
+    """التحقق من إلغاء العملية الحالية"""
+    global _current_window
+    if _current_window:
+        return _current_window.is_cancelled()
+    return False
+
 def close_progress():
     global _current_window
     if _current_window:
@@ -552,6 +727,11 @@ def show_confirm(title, message, show_cancel=True):
 
 def show_message(title, message):
     return ConfirmDialog(title, message, show_cancel=False).show()
+
+def show_skipped_components(skipped_components):
+    """Show dialog with skipped components and solution steps"""
+    if skipped_components and len(skipped_components) > 0:
+        SkippedComponentsDialog(skipped_components).show()
 
 def show_finished_in_progress(message="Completed!"):
     global _current_window

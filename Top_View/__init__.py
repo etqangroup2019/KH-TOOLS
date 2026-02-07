@@ -266,15 +266,9 @@ class import_skp(bpy.types.Operator):
     bl_label = "SKP"
 
     def execute(self, context):
-        file_path = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_script.py")
-        if os.path.exists(file_path):
-            with open(file_path, "r") as f:
-                script_code = f.read()
-                exec(script_code)
-            print("تم تنفيذ الكود بنجاح!")
-        else:
-            print("لا يمكن العثور على ملف النص.")
-        main()
+        # لم يعد هناك حاجة لهذا الكلاس - تم نقل الوظيفة إلى sketchup_script()
+        # يتم الآن التعامل مع الاستيراد تلقائياً عبر timer
+        print("SKP | Import is now handled automatically")
         return {'FINISHED'}
     
 preview_collection2 = bpy.utils.previews.new()
@@ -297,15 +291,9 @@ class update_skp(bpy.types.Operator):
     bl_label = "SKP"
 
     def execute(self, context):
-        file_path = os.path.join(os.path.expanduser("~"), "Documents", "update_script.py")
-        if os.path.exists(file_path):
-            with open(file_path, "r") as f:
-                script_code = f.read()
-                exec(script_code)
-            print("تم تنفيذ الكود بنجاح!")
-        else:
-            print("لا يمكن العثور على ملف النص.")
-        main1()
+        # لم يعد هناك حاجة لهذا الكلاس - تم نقل الوظيفة إلى update_script()
+        # يتم الآن التعامل مع التحديث تلقائياً عبر timer
+        print("SKP | Update is now handled automatically")
         return {'FINISHED'}
     
 preview_collection3 = bpy.utils.previews.new()
@@ -329,11 +317,13 @@ def delete_file(file_path):
     else:
         print("الملف غير موجود")
 def main():
-    file_path = os.path.join(os.path.expanduser("~"), "Documents", "Sketchup_script.py")
+    # تحديث اسم الملف الجديد
+    file_path = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_import_data.txt")
     delete_file(file_path)
 
 def main1():
-    file_path = os.path.join(os.path.expanduser("~"), "Documents", "update_script.py")
+    # تحديث اسم الملف الجديد
+    file_path = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_update_data.txt")
     delete_file(file_path)
     
 
@@ -383,7 +373,7 @@ def draw_callback_smart(self, context):
         layout.operator("object.smart_uv", icon='TEXTURE')
         layout.operator("object.cube_uv", icon='FACE_MAPS')
         layout.operator("object.asset", icon='ASSET_MANAGER')
-        file_path = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_script.py")
+        file_path = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_import_data.txt")
         if os.path.exists(file_path):
             layout.operator("view3d.import_skp",icon_value=preview_collection['26.png'].icon_id)
             
@@ -393,7 +383,7 @@ def draw_callback_smart(self, context):
             if collection.name == "SKP Master":
                 skp_old_exists = True
                 break   
-        file_path1 = os.path.join(os.path.expanduser("~"), "Documents", "update_script.py")
+        file_path1 = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_update_data.txt")
         if os.path.exists(file_path1):
             if skp_old_exists:
                 layout.operator("view3d.update_skp",icon_value=preview_collection1['27.png'].icon_id)
