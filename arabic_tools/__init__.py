@@ -158,6 +158,7 @@ def is_reshaped(text):
             return False
     return True
 
+
 def _reshape_data_block(data_block):
     """Reshape the name of a single data block. Returns True if changed."""
     if data_block is None:
@@ -183,11 +184,12 @@ def _reshape_collection(collection_attr):
         pass
     return count
 
+
 @persistent
 def auto_reshape_handler(scene):
     # Safe guard
     if not bpy.data: return
-    
+
     # All data collections to reshape
     data_collections = [
         bpy.data.objects,        # Objects
@@ -219,12 +221,41 @@ def auto_reshape_handler(scene):
     for collection in data_collections:
         _reshape_collection(collection)
 
+    # Iterate Objects
+    for obj in bpy.data.objects:
+        if not is_reshaped(obj.name):
+            try:
+                new_name = reshape(obj.name)
+                if new_name != obj.name:
+                    obj.name = new_name
+            except: pass
+                
+    # Iterate Collections
+    for col in bpy.data.collections:
+        if not is_reshaped(col.name):
+             try:
+                new_name = reshape(col.name)
+                if new_name != col.name:
+                    col.name = new_name
+             except: pass
+                
+    # Iterate Materials
+    for mat in bpy.data.materials:
+        if mat and not is_reshaped(mat.name):
+             try:
+                new_name = reshape(mat.name)
+                if new_name != mat.name:
+                    mat.name = new_name
+             except: pass
+
+
 class ARABIC_OT_fix_all(bpy.types.Operator):
     """Fix All Arabic Names Now"""
     bl_idname = "arabic.fix_all"
     bl_label = "Fix All Arabic Names"
     
     def execute(self, context):
+
         total = 0
         
         data_collections = [
@@ -256,6 +287,7 @@ class ARABIC_OT_fix_all(bpy.types.Operator):
             total += _reshape_collection(collection)
         
         self.report({'INFO'}, f"Arabic Reshaper: Fixed {total} names")
+
         return {'FINISHED'}
 
 class ARABIC_PT_panel(bpy.types.Panel):
