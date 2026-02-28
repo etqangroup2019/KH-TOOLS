@@ -1,4 +1,4 @@
-require 'sketchup'
+﻿require 'sketchup'
 require 'sketchup.rb'
 require 'extensions.rb'
 require 'langhandler.rb'

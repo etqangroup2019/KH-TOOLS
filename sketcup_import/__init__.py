@@ -67,7 +67,8 @@ from .progress_window import (
     close_progress,
     show_confirm,
     show_message,
-    show_finished_in_progress
+    show_finished_in_progress,
+    show_skipped_components
 )
 
 #KH-Asset
@@ -478,6 +479,7 @@ class SceneImporter():
     def __init__(self):
         self.filepath = '/tmp/untitled.skp'
         self.name_mapping = {}
+        self.skipped_components = []  # قائمة الكومبوننتات المتجاوزة
         self.component_meshes = {}
         self.scene = None
         self.layers_skip = []
@@ -507,12 +509,11 @@ class SceneImporter():
         # الحصول على نافذة التقدم
         progress_win = get_current_progress()
         
-        documents_path = os.path.expanduser("~/Documents")
-        file_path = os.path.join(documents_path, "components Not imported.txt")
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        else :
-            print("File 'components Not imported.txt' is not present.")
+        # الحصول على نافذة التقدم
+        progress_win = get_current_progress()
+        
+        # لا حاجة لملف components Not imported.txt بعد الآن
+        # سيتم عرض الكومبوننتات المتجاوزة في نافذة اللوق مباشرة
         
         # Start stopwatch for overall import
         _time_main = time.time()
@@ -775,18 +776,18 @@ class SceneImporter():
 
         bpy.ops.outliner.orphans_purge(do_recursive=True)
 
-        documents_path = os.path.expanduser("~/Documents")
-        file_path = os.path.join(documents_path, "components Not imported.txt")
-        if os.path.exists(file_path):
-            os.system(f"start notepad.exe {file_path}")
-        else :
-            print("File 'components Not imported.txt' is not present.")
+        # لا حاجة لفتح Notepad - الكومبوننتات المتجاوزة معروضة في اللوق
         
         # إظهار رسالة الانتهاء في نافذة التقدم
         if progress_win:
             progress_win.update_progress(100, "Import completed!")
+            progress_win.log_message("=" * 50)
             progress_win.log_message("Import process finished successfully")
             show_finished_in_progress("SKP file imported successfully!")
+            
+            # إظهار نافذة الكومبوننتات المتجاوزة إذا كانت موجودة
+            if self.skipped_components:
+                show_skipped_components(self.skipped_components)
         
         self.FenceCollection()    
         return {'FINISHED'}
@@ -807,9 +808,20 @@ class SceneImporter():
         for i in range(max_depth + 1):
             for k, v in component_stats.items():
                 name, mat = k
+                # التحقق من وجود الكومبوننت قبل الوصول إليه
+                if name not in self.component_depth:
+                    if LOGS:
+                        skp_log(f"Warning: Component '{name}' not found in depth analysis, skipping")
+                    # إضافة إلى قائمة المتجاوزة
+                    self.skipped_components.append(name)
+                    progress_win = get_current_progress()
+                    if progress_win:
+                        progress_win.log_message(f"Skipped component: {name} (not in depth analysis)")
+                    continue
+                    
                 depth = self.component_depth[name]
                 #print(k, len(v), depth)
-                comp_def = self.skp_components[name]
+                comp_def = self.skp_components.get(name)
                 if comp_def and depth == 1:
                     #self.component_skip[(name,mat)] = comp_def.entities
                     pass
@@ -874,33 +886,16 @@ class SceneImporter():
                 print(f"     {Matrix(instance.transform)}")
             # KH
             if cdef is None:
-                documents_path = os.path.expanduser("~/Documents")
-                file_path = os.path.join(documents_path, "components Not imported.txt")
-
-                # Check if the file already exists
-                if os.path.exists(file_path):
-                    print("File 'components Not imported.txt' already exists.")
-                else:
-                    # Create a new file if it doesn't exist
-                    with open(file_path, "w") as file:
-                        file.write("This message appears if there is a component that has a problem and was not imported. It is included in this list to be verified ..\n")
-                        file.write("\n")
-                        file.write("--------------------------------------------------------------------------\n")
-                        file.write("Solution:\n")
-                        file.write("1- Search for the components by name in the Sketchup file.\n")
-                        file.write("2- Explode it and then put it in a group instead of a component.\n")
-                        file.write("3- Re-import the skp file into Blender.\n")
-                        file.write("\n")
-                        file.write("Note: This text file is located in the Documents folder\n")
-                        file.write("--------------------------------------------------------------------------\n")
-                        file.write("\n")
-                        file.write("Names of components Check:\n")
-                        file.write("\n")
- 
-                # Write the instance definition name to the file
-                with open(file_path, "a") as file:
-                    file.write(f"{instance.definition.name}\n")
-                    file.write("\n")
+                # عرض الكومبوننت المتجاوز في نافذة اللوق
+                component_name = instance.definition.name
+                # إزالة البادئة G- إذا كانت موجودة
+                clean_name = component_name.replace("G-", "") if component_name.startswith("G-") else component_name
+                self.skipped_components.append(clean_name)
+                progress_win = get_current_progress()
+                if progress_win:
+                    progress_win.log_message(f"⚠ Skipped component: {clean_name}")
+                if LOGS:
+                    skp_log(f"Component not found: {clean_name}")
                 continue
  
             self.analyze_entities(cdef.entities,
@@ -1558,6 +1553,7 @@ class SceneImporterupdate():
 
         self.filepath = '/tmp/untitled.skp'
         self.name_mapping = {}
+        self.skipped_components = []  # قائمة الكومبوننتات المتجاوزة
         self.component_meshes = {}
         self.scene = None
         self.layers_skip = []
@@ -1587,14 +1583,8 @@ class SceneImporterupdate():
         # الحصول على نافذة التقدم
         progress_win = get_current_progress()
 
-        documents_path = os.path.expanduser("~/Documents")
-        file_path = os.path.join(documents_path, "components Not imported.txt")
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        else :
-            print("File 'components Not imported.txt' is not present.")
-
-
+        # لا حاجة لملف components Not imported.txt بعد الآن
+        # سيتم عرض الكومبوننتات المتجاوزة في نافذة اللوق مباشرة
 
         skp_log(f'Importing: {self.filepath}')
         if progress_win:
@@ -1809,17 +1799,18 @@ class SceneImporterupdate():
 
         bpy.ops.outliner.orphans_purge(do_recursive=True)
         documents_path = os.path.expanduser("~/Documents")
-        file_path = os.path.join(documents_path, "components Not imported.txt")
-        if os.path.exists(file_path):
-            os.system(f"start notepad.exe {file_path}")
-        else :
-            print("File 'components Not imported.txt' is not present.")
+        # لا حاجة لفتح Notepad - الكومبوننتات المتجاوزة معروضة في اللوق
         
         # إظهار رسالة الانتهاء في نافذة التقدم
         if progress_win:
             progress_win.update_progress(100, "Update completed!")
+            progress_win.log_message("=" * 50)
             progress_win.log_message("Update process finished successfully")
             show_finished_in_progress("SKP file updated successfully!")
+            
+            # إظهار نافذة الكومبوننتات المتجاوزة إذا كانت موجودة
+            if self.skipped_components:
+                show_skipped_components(self.skipped_components)
             
         self.FenceCollection()        
         return {'FINISHED'}
@@ -1840,6 +1831,18 @@ class SceneImporterupdate():
         for i in range(max_depth + 1):
             for k, v in component_stats.items():
                 name, mat = k
+                # التحقق من وجود الكومبوننت قبل الوصول إليه
+                if name not in self.component_depth:
+                    if LOGS:
+                        skp_log(f"Warning: Component '{name}' not found in depth analysis, skipping")
+                    # إضافة إلى قائمة المتجاوزة (إزالة البادئة G-)
+                    clean_name = name.replace("G-", "") if name.startswith("G-") else name
+                    self.skipped_components.append(clean_name)
+                    progress_win = get_current_progress()
+                    if progress_win:
+                        progress_win.log_message(f"⚠ Skipped component: {clean_name} (not in depth analysis)")
+                    continue
+                    
                 depth = self.component_depth[name]
                 #print(k, len(v), depth)
                 comp_def = self.skp_components[name]
@@ -1898,33 +1901,16 @@ class SceneImporterupdate():
             cdef = self.skp_components.get(instance.definition.name)
 
             if cdef is None:
-                documents_path = os.path.expanduser("~/Documents")
-                file_path = os.path.join(documents_path, "components Not imported.txt")
-
-                # Check if the file already exists
-                if os.path.exists(file_path):
-                    print("File 'components Not imported.txt' already exists.")
-                else:
-                    # Create a new file if it doesn't exist
-                    with open(file_path, "w") as file:
-                        file.write("This message appears if there is a component that has a problem and was not imported. It is included in this list to be verified ..\n")
-                        file.write("\n")
-                        file.write("--------------------------------------------------------------------------\n")
-                        file.write("Solution:\n")
-                        file.write("1- Search for the components by name in the Sketchup file.\n")
-                        file.write("2- Explode it and then put it in a group instead of a component.\n")
-                        file.write("3- Re-import the skp file into Blender.\n")
-                        file.write("\n")
-                        file.write("Note: This text file is located in the Documents folder\n")
-                        file.write("--------------------------------------------------------------------------\n")
-                        file.write("\n")
-                        file.write("Names of components Check:\n")
-                        file.write("\n")
- 
-                # Write the instance definition name to the file
-                with open(file_path, "a") as file:
-                    file.write(f"{instance.definition.name}\n")
-                    file.write("\n")
+                # عرض الكومبوننت المتجاوز في نافذة اللوق
+                component_name = instance.definition.name
+                # إزالة البادئة G- إذا كانت موجودة
+                clean_name = component_name.replace("G-", "") if component_name.startswith("G-") else component_name
+                self.skipped_components.append(clean_name)
+                progress_win = get_current_progress()
+                if progress_win:
+                    progress_win.log_message(f"⚠ Skipped component: {clean_name}")
+                if LOGS:
+                    skp_log(f"Component not found: {clean_name}")
                 continue
 
             self.analyze_entities(cdef.entities,
@@ -3180,6 +3166,15 @@ class SKPN(bpy.types.Operator):
     
     def process_step(self):
         context = bpy.context
+        
+        # التحقق من إلغاء العملية
+        if self._progress_window and self._progress_window.is_cancelled():
+            self._progress_window.log_message("Setup cancelled by user")
+            self._progress_window.show_finished("Setup cancelled!")
+            self._progress_window = None
+            context.scene.loading_progress = 0
+            return None  # إيقاف المؤقت
+        
         if self._current_step < len(self._steps):
             progress_percent = int((self._current_step) / len(self._steps) * 100)
             context.scene.loading_progress = progress_percent
@@ -3387,6 +3382,15 @@ class Update_File(bpy.types.Operator):
     
     def process_step(self):
         context = bpy.context
+        
+        # التحقق من إلغاء العملية
+        if self._progress_window and self._progress_window.is_cancelled():
+            self._progress_window.log_message("Update cancelled by user")
+            self._progress_window.show_finished("Update cancelled!")
+            self._progress_window = None
+            context.scene.loading_progress = 0
+            return None  # إيقاف المؤقت
+        
         if self._current_step < len(self._steps):
             progress_percent = int((self._current_step) / len(self._steps) * 100)
             context.scene.loading_progress = progress_percent
@@ -4160,10 +4164,106 @@ class KH_tools_Tutoril(bpy.types.Panel):
 #aoto import//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def sketchup_script():
-    file_path = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_script.py")
+    file_path = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_import_data.txt")
     if os.path.exists(file_path):
-        bpy.ops.view3d.import_skp() 
-        bpy.app.timers.register(sketchup_script) 
+        try:
+            # قراءة بيانات الملف
+            action = None
+            model_path = None
+            file_name = None
+            
+            # محاولة قراءة الملف مع إعادة المحاولة
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
+                        if len(lines) >= 3:
+                            action = lines[0].strip()
+                            model_path = lines[1].strip()
+                            file_name = lines[2].strip()
+                    break  # نجحت القراءة
+                except PermissionError:
+                    if attempt < max_retries - 1:
+                        time.sleep(0.2)  # انتظر قليلاً وحاول مرة أخرى
+                    else:
+                        raise  # فشلت جميع المحاولات
+            
+            # إغلاق الملف قبل الحذف
+            if action == "IMPORT" and model_path and file_name:
+                # حذف الملف بعد إغلاقه
+                for attempt in range(5):
+                    try:
+                        time.sleep(0.1)
+                        os.remove(file_path)
+                        break
+                    except PermissionError:
+                        if attempt < 4:
+                            time.sleep(0.2)
+                        else:
+                            print(f"SKP | Warning: Could not delete file, will try later")
+                
+                # إظهار نافذة تأكيد الاستيراد
+                import_confirmation = show_confirm(
+                    "Import SketchUp", 
+                    f"Do you want to import the file?\n\n{file_name}"
+                )
+                
+                if import_confirmation:
+                    # حساب مسار الحفظ
+                    file_base = os.path.splitext(file_name)[0]
+                    folder_path = os.path.dirname(model_path)
+                    blender_file_name = file_base + ".blend"
+                    
+                    # التأكد من أن الاسم فريد
+                    count = 1
+                    while os.path.exists(os.path.join(folder_path, blender_file_name)):
+                        blender_file_name = f"{file_base}_{count}.blend"
+                        count += 1
+                    
+                    # تحويل المسار لعرض صحيح (استبدال \ بـ /)
+                    display_path = folder_path.replace('\\', '/')
+                    
+                    # نافذة تأكيد الحفظ
+                    save_confirmation = show_confirm(
+                        "Save After Import", 
+                        f"Do you want to save the file after import?\n\nPath: {display_path}\nFile: {blender_file_name}"
+                    )
+                    
+                    # بدء عملية الاستيراد
+                    progress_win = start_import_progress()
+                    progress_win.log_message(f"Importing: {file_name}")
+                    
+                    bpy.ops.import_scene.skp_k(filepath=model_path)
+                    bpy.ops.object.skp_addonn()
+                    
+                    if save_confirmation:
+                        save_path = os.path.join(folder_path, blender_file_name)
+                        bpy.ops.wm.save_mainfile(filepath=save_path)
+                        progress_win.log_message(f"File saved: {save_path}")
+                    
+                    show_finished_in_progress("Import completed successfully!")
+                else:
+                    # إذا ألغى المستخدم، حاول حذف الملف
+                    try:
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                    except:
+                        pass
+                        
+        except PermissionError:
+            # الملف مفتوح من قبل عملية أخرى، سنحاول في المرة القادمة
+            pass
+        except Exception as e:
+            print(f"SKP | Error in sketchup_script: {e}")
+            # حاول حذف الملف في حالة الخطأ
+            try:
+                if os.path.exists(file_path):
+                    time.sleep(0.3)
+                    os.remove(file_path)
+            except:
+                pass
+    
     return 5
 
 @bpy.app.handlers.persistent 
@@ -4174,16 +4274,89 @@ def load_handler(dummy):
 
 
 def update_script():
-    file_path = os.path.join(os.path.expanduser("~"), "Documents", "update_script.py")
+    file_path = os.path.join(os.path.expanduser("~"), "Documents", "sketchup_update_data.txt")
     if os.path.exists(file_path):
-        skp_old_exists = False
-        for collection in bpy.data.collections:
-            if collection.name == "SKP Master":
-                skp_old_exists = True
-                break  
-        if skp_old_exists:
-            bpy.ops.view3d.update_skp()
-            bpy.app.timers.register(update_script) 
+        try:
+            # قراءة بيانات الملف
+            action = None
+            model_path = None
+            file_name = None
+            
+            # محاولة قراءة الملف مع إعادة المحاولة
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        lines = f.readlines()
+                        if len(lines) >= 3:
+                            action = lines[0].strip()
+                            model_path = lines[1].strip()
+                            file_name = lines[2].strip()
+                    break  # نجحت القراءة
+                except PermissionError:
+                    if attempt < max_retries - 1:
+                        time.sleep(0.2)  # انتظر قليلاً وحاول مرة أخرى
+                    else:
+                        raise  # فشلت جميع المحاولات
+            
+            # إغلاق الملف قبل الحذف
+            if action == "UPDATE" and model_path and file_name:
+                # التحقق من وجود SKP Master
+                skp_old_exists = False
+                for collection in bpy.data.collections:
+                    if collection.name == "SKP Master":
+                        skp_old_exists = True
+                        break
+                
+                if skp_old_exists:
+                    # حذف الملف بعد إغلاقه
+                    for attempt in range(5):
+                        try:
+                            time.sleep(0.1)
+                            os.remove(file_path)
+                            break
+                        except PermissionError:
+                            if attempt < 4:
+                                time.sleep(0.2)
+                            else:
+                                print(f"SKP | Warning: Could not delete file, will try later")
+                    
+                    # إظهار نافذة تأكيد التحديث
+                    update_confirmation = show_confirm(
+                        "Update SketchUp", 
+                        f"Do you want to update the file?\n\n{file_name}"
+                    )
+                    
+                    if update_confirmation:
+                        # بدء عملية التحديث
+                        progress_win = start_import_progress()
+                        progress_win.log_message(f"Updating: {file_name}")
+                        
+                        bpy.ops.import_scene_update.skp(filepath=model_path)
+                        bpy.ops.object.skp_update_file()
+                        
+                        show_finished_in_progress("Update completed successfully!")
+                    else:
+                        # إذا ألغى المستخدم، حاول حذف الملف
+                        try:
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                        except:
+                            pass
+                            
+        except PermissionError:
+            # الملف مفتوح من قبل عملية أخرى، سنحاول في المرة القادمة
+            pass
+        except Exception as e:
+            print(f"SKP | Error in update_script: {e}")
+            # حاول حذف الملف في حالة الخطأ
+            try:
+                if os.path.exists(file_path):
+                    time.sleep(0.3)
+                    os.remove(file_path)
+            except:
+                pass
+    
     return 5
 
 @bpy.app.handlers.persistent  

@@ -92,6 +92,7 @@ from .sketcup_import import *
 from .Random_Asset import *
 from .update import *
 from .select_linked_pick import *
+from .arabic_tools import *
 
 if bpy.app.version >= (4, 2, 0):
     from . import skp_drag_drop
@@ -456,6 +457,8 @@ def register():
     select_linked_pick.register()
     if bpy.app.version >= (4, 2, 0):
         skp_drag_drop.register()
+    
+    arabic_tools.register()
 
 def unregister():
     for i in classes:
@@ -477,6 +480,8 @@ def unregister():
 
     if bpy.app.version >= (4, 2, 0):
         skp_drag_drop.unregister()
+    
+    arabic_tools.unregister()
 
 if __name__ == "__main__":
     try:
