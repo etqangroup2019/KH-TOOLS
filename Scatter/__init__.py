@@ -1166,7 +1166,16 @@ class kh_scatter_Panel(bpy.types.Panel):
                 select_icon = 'RESTRICT_SELECT_OFF' if is_selected else 'RESTRICT_SELECT_ON'
                 row.operator("object.select_particle_system", text="", icon=select_icon).particle_system_index = ps_idx
                 
-                row.prop(ps, "name", text="", emboss=False, icon="PARTICLES")
+                # Compact selector: Hide X, Copy, and Fake User, keep only the name and interactive users count
+                if ps.settings:
+                    row.prop(ps, "settings", text="", icon='PARTICLES')
+                    if ps.settings.users > 1:
+                        op = row.operator("object.kh_make_single_user", text=str(ps.settings.users))
+                        op.object_name = obj.name
+                        op.psys_index = ps_idx
+                        op.modifier_name = ""
+                else:
+                    row.label(text="None", icon='PARTICLES')
                 
                 # Find associated modifier for visibility toggles
                 for mod in obj.modifiers:
@@ -1183,10 +1192,6 @@ class kh_scatter_Panel(bpy.types.Panel):
                         break
                 
                 row.operator("object.particle_delete", text="", icon='TRASH').particle_system_index1 = ps_idx
-                
-                # Settings below the layer row
-                row = box.row()
-                row.template_ID(ps, "settings", new="particle.new")
 
             # Draw "Scatter on Surface" Geometry Nodes modifiers
             for mod in obj.modifiers:
@@ -1205,7 +1210,16 @@ class kh_scatter_Panel(bpy.types.Panel):
                     select_icon = 'RESTRICT_SELECT_OFF' if is_selected else 'RESTRICT_SELECT_ON'
                     row.operator("object.select_scatter_modifier", text="", icon=select_icon).modifier_name = mod.name
                     
-                    row.prop(mod, "name", text="", emboss=False, icon="GEOMETRY_NODES")
+                    # Compact selector: Hide X, Copy, and Fake User, keep only the name and interactive users count
+                    if mod.node_group:
+                        row.prop(mod, "node_group", text="", icon='GEOMETRY_NODES')
+                        if mod.node_group.users > 1:
+                            op = row.operator("object.kh_make_single_user", text=str(mod.node_group.users))
+                            op.object_name = obj.name
+                            op.modifier_name = mod.name
+                            op.psys_index = -1
+                    else:
+                        row.label(text="None", icon='GEOMETRY_NODES')
                     
                     # Toggle Display button
                     coll = mod.get("Socket_7") or mod.get("Collection")
@@ -1310,6 +1324,265 @@ class kh_scatter_Panel(bpy.types.Panel):
         else:
             layout.label(text="Select your object first !", icon="QUESTION")
             
+class KH_OT_MakeSingleUser(bpy.types.Operator):
+    bl_idname = "object.kh_make_single_user"
+    bl_label = "Make Single User"
+    bl_description = "Make this scatter unique (unlinks from other objects)"
+    
+    object_name: bpy.props.StringProperty()
+    modifier_name: bpy.props.StringProperty(default="")
+    psys_index: bpy.props.IntProperty(default=-1)
+    
+    def execute(self, context):
+        obj = bpy.data.objects.get(self.object_name)
+        if not obj: return {'CANCELLED'}
+        
+        if self.modifier_name:
+            mod = obj.modifiers.get(self.modifier_name)
+            if mod and mod.type == 'NODES' and mod.node_group:
+                # Duplicate the node group
+                mod.node_group = mod.node_group.copy()
+                self.report({'INFO'}, "Scatter data is now unique")
+        elif self.psys_index >= 0:
+            if 0 <= self.psys_index < len(obj.particle_systems):
+                ps = obj.particle_systems[self.psys_index]
+                if ps.settings:
+                    # Duplicate the particle settings
+                    ps.settings = ps.settings.copy()
+                    self.report({'INFO'}, "Particle data is now unique")
+        
+        return {'FINISHED'}
+
+class KH_OT_NavigateToScatter(bpy.types.Operator):
+    bl_idname = "object.kh_navigate_to_scatter"
+    bl_label = "Navigate to Scatter"
+    bl_description = "Select the object and highlight this scatter system"
+    
+    object_name: bpy.props.StringProperty()
+    modifier_name: bpy.props.StringProperty(default="")
+    psys_index: bpy.props.IntProperty(default=-1)
+    
+    def execute(self, context):
+        target_obj = bpy.data.objects.get(self.object_name)
+        if not target_obj:
+            self.report({'WARNING'}, f"Object '{self.object_name}' not found")
+            return {'CANCELLED'}
+        
+        # Deselect all, select and make active
+        bpy.ops.object.select_all(action='DESELECT')
+        target_obj.select_set(True)
+        context.view_layer.objects.active = target_obj
+        
+        # Highlight the specific scatter system
+        if self.modifier_name:
+            context.scene.selected_scatter_modifier = self.modifier_name
+            context.scene.selected_particle_system = -1
+        elif self.psys_index >= 0:
+            context.scene.selected_particle_system = self.psys_index
+            context.scene.selected_scatter_modifier = ""
+        
+        return {'FINISHED'}
+
+class KH_OT_ToggleScatterVisibility(bpy.types.Operator):
+    bl_idname = "object.kh_toggle_scatter_visibility"
+    bl_label = "Toggle Scatter Visibility"
+    bl_description = "Toggle viewport or render visibility for this scatter"
+    
+    object_name: bpy.props.StringProperty()
+    modifier_name: bpy.props.StringProperty(default="")
+    psys_index: bpy.props.IntProperty(default=-1)
+    toggle_type: bpy.props.StringProperty(default="VIEWPORT")  # VIEWPORT or RENDER
+    
+    def execute(self, context):
+        target_obj = bpy.data.objects.get(self.object_name)
+        if not target_obj:
+            return {'CANCELLED'}
+        
+        if self.modifier_name:
+            mod = target_obj.modifiers.get(self.modifier_name)
+            if mod:
+                if self.toggle_type == 'VIEWPORT':
+                    mod.show_viewport = not mod.show_viewport
+                else:
+                    mod.show_render = not mod.show_render
+        elif self.psys_index >= 0:
+            # Find the particle system modifier
+            if 0 <= self.psys_index < len(target_obj.particle_systems):
+                psys = target_obj.particle_systems[self.psys_index]
+                for mod in target_obj.modifiers:
+                    if mod.type == 'PARTICLE_SYSTEM' and mod.particle_system == psys:
+                        if self.toggle_type == 'VIEWPORT':
+                            mod.show_viewport = not mod.show_viewport
+                        else:
+                            mod.show_render = not mod.show_render
+                        break
+        
+        return {'FINISHED'}
+
+class KH_OT_DeleteScatterFromProject(bpy.types.Operator):
+    bl_idname = "object.kh_delete_scatter_from_project"
+    bl_label = "Delete Scatter"
+    bl_description = "Delete this scatter system"
+    
+    object_name: bpy.props.StringProperty()
+    modifier_name: bpy.props.StringProperty(default="")
+    psys_index: bpy.props.IntProperty(default=-1)
+    
+    def execute(self, context):
+        target_obj = bpy.data.objects.get(self.object_name)
+        if not target_obj:
+            return {'CANCELLED'}
+        
+        # Temporarily make this the active object
+        prev_active = context.view_layer.objects.active
+        context.view_layer.objects.active = target_obj
+        
+        if self.modifier_name:
+            # Use the existing delete operator logic
+            bpy.ops.object.particle_delete(modifier_name=self.modifier_name)
+        elif self.psys_index >= 0:
+            bpy.ops.object.particle_delete(particle_system_index1=self.psys_index)
+        
+        # Restore active object
+        if prev_active and prev_active.name in bpy.data.objects:
+            context.view_layer.objects.active = prev_active
+        
+        return {'FINISHED'}
+
+
+class kh_scatter_Project_Panel(bpy.types.Panel):
+    bl_label = ""
+    bl_idname = "KH_PT_Scatter_Project_Panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'KH-Tools'
+    bl_options = {'DEFAULT_CLOSED'}
+    bl_parent_id = "KH_PT_ParticleSystemPanel"
+    
+    @classmethod
+    def poll(cls, context):
+        return get_addon_preferences(context, 'KH_Scatter') == True
+    
+    def draw_header(self, context: bpy.types.Context):
+        self.layout.label(text="Project Scatter", icon="WORLD")
+    
+    def draw(self, context):
+        layout = self.layout
+        
+        found_any = False
+        
+        for obj in bpy.data.objects:
+            if obj.type != 'MESH':
+                continue
+            
+            # --- GeoNodes Scatter modifiers ---
+            for mod in obj.modifiers:
+                if mod.type == 'NODES' and (mod.name.startswith("Scatter on Surface") or mod.name.startswith("KH-")):
+                    found_any = True
+                    is_current = (context.object == obj and context.scene.selected_scatter_modifier == mod.name)
+                    
+                    box = layout.box()
+                    if is_current:
+                        box.alert = True
+                    
+                    # Header row: object name
+                    row = box.row(align=True)
+                    
+                    # Navigate button
+                    nav_icon = 'RESTRICT_SELECT_OFF' if is_current else 'RESTRICT_SELECT_ON'
+                    op_nav = row.operator("object.kh_navigate_to_scatter", text="", icon=nav_icon)
+                    op_nav.object_name = obj.name
+                    op_nav.modifier_name = mod.name
+                    op_nav.psys_index = -1
+                    
+                    # Editable object name
+                    row.prop(obj, "name", text="", icon="GEOMETRY_NODES")
+                    
+                    # Display toggle (bounds/textured)
+                    coll = mod.get("Socket_7") or mod.get("Collection")
+                    if coll and isinstance(coll, bpy.types.Collection):
+                        first_mesh = next((o for o in coll.all_objects if o.type == 'MESH'), None)
+                        disp_icon = "SHADING_BBOX" if first_mesh and first_mesh.display_type != 'BOUNDS' else "SHADING_TEXTURE"
+                        row.operator("object.kh_scatter_toggle_display", text="", icon=disp_icon).collection_name = coll.name
+                    
+                    # Viewport visibility
+                    vp_icon = 'RESTRICT_VIEW_OFF' if mod.show_viewport else 'RESTRICT_VIEW_ON'
+                    op_vp = row.operator("object.kh_toggle_scatter_visibility", text="", icon=vp_icon)
+                    op_vp.object_name = obj.name
+                    op_vp.modifier_name = mod.name
+                    op_vp.toggle_type = 'VIEWPORT'
+                    
+                    # Render visibility
+                    rn_icon = 'RESTRICT_RENDER_OFF' if mod.show_render else 'RESTRICT_RENDER_ON'
+                    op_rn = row.operator("object.kh_toggle_scatter_visibility", text="", icon=rn_icon)
+                    op_rn.object_name = obj.name
+                    op_rn.modifier_name = mod.name
+                    op_rn.toggle_type = 'RENDER'
+                    
+                    # Delete
+                    op_del = row.operator("object.kh_delete_scatter_from_project", text="", icon='TRASH')
+                    op_del.object_name = obj.name
+                    op_del.modifier_name = mod.name
+            
+            # --- Particle Systems ---
+            for ps_idx, ps in enumerate(obj.particle_systems):
+                found_any = True
+                is_current = (context.object == obj and context.scene.selected_particle_system == ps_idx)
+                
+                box = layout.box()
+                if is_current:
+                    box.alert = True
+                
+                row = box.row(align=True)
+                
+                # Navigate button
+                nav_icon = 'RESTRICT_SELECT_OFF' if is_current else 'RESTRICT_SELECT_ON'
+                op_nav = row.operator("object.kh_navigate_to_scatter", text="", icon=nav_icon)
+                op_nav.object_name = obj.name
+                op_nav.modifier_name = ""
+                op_nav.psys_index = ps_idx
+                
+                # Editable object name
+                row.prop(obj, "name", text="", icon="PARTICLES")
+                
+                # Display toggle (bounds/textured)
+                coll = ps.settings.instance_collection if ps.settings else None
+                if coll:
+                    first_mesh = next((o for o in coll.all_objects if o.type == 'MESH'), None)
+                    disp_icon = "SHADING_BBOX" if first_mesh and first_mesh.display_type != 'BOUNDS' else "SHADING_TEXTURE"
+                    row.operator("object.kh_scatter_toggle_display", text="", icon=disp_icon).collection_name = coll.name
+                
+                # Find modifier for viewport/render visibility
+                ps_mod = None
+                for mod in obj.modifiers:
+                    if mod.type == 'PARTICLE_SYSTEM' and mod.particle_system == ps:
+                        ps_mod = mod
+                        break
+                
+                if ps_mod:
+                    # Viewport visibility
+                    vp_icon = 'RESTRICT_VIEW_OFF' if ps_mod.show_viewport else 'RESTRICT_VIEW_ON'
+                    op_vp = row.operator("object.kh_toggle_scatter_visibility", text="", icon=vp_icon)
+                    op_vp.object_name = obj.name
+                    op_vp.psys_index = ps_idx
+                    op_vp.toggle_type = 'VIEWPORT'
+                    
+                    # Render visibility
+                    rn_icon = 'RESTRICT_RENDER_OFF' if ps_mod.show_render else 'RESTRICT_RENDER_ON'
+                    op_rn = row.operator("object.kh_toggle_scatter_visibility", text="", icon=rn_icon)
+                    op_rn.object_name = obj.name
+                    op_rn.psys_index = ps_idx
+                    op_rn.toggle_type = 'RENDER'
+                
+                # Delete
+                op_del = row.operator("object.kh_delete_scatter_from_project", text="", icon='TRASH')
+                op_del.object_name = obj.name
+                op_del.psys_index = ps_idx
+        
+        if not found_any:
+            layout.label(text="No scatter systems in project", icon="INFO")
+
+
 class kh_scatter_Asset_LIST_Panel(bpy.types.Panel):
     bl_label = ""
     bl_idname = "KH_PT_Particle_asset_list_Panel"
@@ -1348,31 +1621,50 @@ class kh_scatter_Asset_LIST_Panel(bpy.types.Panel):
                     
                     if ps.settings.use_collection_count:
                         for particle_weight in ps.settings.instance_weights:
-                            row = box.row()
+                            row = box.row(align=True)
                             name = particle_weight.name.split(':')[0]
-                            row.prop(particle_weight, "count", text=name)
                             
-                            # Find original object for scale (Robust search)
+                            # Select in scene button
                             target_obj = bpy.data.objects.get(particle_weight.name)
                             if not target_obj:
-                                # Try finding by clean name (before :)
                                 clean_name = particle_weight.name.split(':')[0]
                                 target_obj = bpy.data.objects.get(clean_name)
                             
                             if not target_obj and ps.settings.instance_collection:
-                                # search inside the collection specifically
                                 for o in ps.settings.instance_collection.objects:
                                     if o.name.startswith(name):
                                         target_obj = o
                                         break
-                                        
+                            
+                            if target_obj:
+                                # Determine icon based on solo state
+                                soloed_name = context.scene.get("kh_soloed_asset", "")
+                                if soloed_name:
+                                    sel_icon = 'HIDE_OFF' if (soloed_name == target_obj.name) else 'RESTRICT_SELECT_ON'
+                                else:
+                                    sel_icon = 'RESTRICT_SELECT_OFF'
+                                op_sel = row.operator("object.kh_select_asset_in_scene", text="", icon=sel_icon)
+                                op_sel.object_name = target_obj.name
+                                if ps.settings.instance_collection:
+                                    op_sel.collection_name = ps.settings.instance_collection.name
+                            
+                            row.prop(particle_weight, "count", text=name)
+                            
                             if target_obj:
                                 row.prop(target_obj, "scale", index=2, text="Scale")
                     else:
                         # Fallback: show all objects in collection if weight not used
                         coll = ps.settings.instance_collection
                         for sub_obj in coll.objects:
-                            row = box.row()
+                            row = box.row(align=True)
+                            soloed_name = context.scene.get("kh_soloed_asset", "")
+                            if soloed_name:
+                                sel_icon = 'HIDE_OFF' if (soloed_name == sub_obj.name) else 'RESTRICT_SELECT_ON'
+                            else:
+                                sel_icon = 'RESTRICT_SELECT_OFF'
+                            op_sel = row.operator("object.kh_select_asset_in_scene", text="", icon=sel_icon)
+                            op_sel.object_name = sub_obj.name
+                            op_sel.collection_name = coll.name
                             row.label(text=sub_obj.name)
                             row.prop(sub_obj, "scale", index=2, text="Scale")
 
@@ -1401,16 +1693,72 @@ class kh_scatter_Asset_LIST_Panel(bpy.types.Panel):
                         box = layout.box()
                         box.label(text=f"Mod: {mod.name} ({coll.name})", icon='GEOMETRY_NODES')
                         for sub_obj in coll.objects:
-                            row = box.row()
+                            row = box.row(align=True)
+                            soloed_name = context.scene.get("kh_soloed_asset", "")
+                            if soloed_name:
+                                sel_icon = 'HIDE_OFF' if (soloed_name == sub_obj.name) else 'RESTRICT_SELECT_ON'
+                            else:
+                                sel_icon = 'RESTRICT_SELECT_OFF'
+                            op_sel = row.operator("object.kh_select_asset_in_scene", text="", icon=sel_icon)
+                            op_sel.object_name = sub_obj.name
+                            op_sel.collection_name = coll.name
                             row.label(text=sub_obj.name)
                             # Control Z scale which handlers will then unify to X and Y
                             row.prop(sub_obj, "scale", index=2, text="Scale")
 
 # Replaced by Universal Handler
 
-          
-            
-  
+class KH_OT_SelectAssetInScene(bpy.types.Operator):
+    bl_idname = "object.kh_select_asset_in_scene"
+    bl_label = "Solo Asset Type on Surface"
+    bl_description = "Show only this asset type on the surface to identify it. Click again to show all"
+    
+    object_name: bpy.props.StringProperty()
+    collection_name: bpy.props.StringProperty(default="")
+    
+    def execute(self, context):
+        target_obj = bpy.data.objects.get(self.object_name)
+        if not target_obj:
+            self.report({'WARNING'}, f"Object '{self.object_name}' not found")
+            return {'CANCELLED'}
+        
+        coll = bpy.data.collections.get(self.collection_name) if self.collection_name else None
+        if not coll:
+            self.report({'WARNING'}, "Collection not found")
+            return {'CANCELLED'}
+        
+        # Check if this object is already soloed (all others are hidden)
+        other_objects = [o for o in coll.objects if o != target_obj]
+        all_others_hidden = all(o.hide_render for o in other_objects) if other_objects else False
+        target_is_soloed = all_others_hidden and not target_obj.hide_render and len(other_objects) > 0
+        
+        if target_is_soloed:
+            # UN-SOLO: Restore all objects visibility
+            for o in coll.objects:
+                o.hide_render = False
+                o.hide_viewport = False
+            # Store the un-soloed state
+            context.scene["kh_soloed_asset"] = ""
+            self.report({'INFO'}, f"Showing all types")
+        else:
+            # SOLO: Hide all others, show only the target
+            for o in coll.objects:
+                if o == target_obj:
+                    o.hide_render = False
+                    o.hide_viewport = False
+                else:
+                    o.hide_render = True
+                    o.hide_viewport = True
+            # Store which object is soloed
+            context.scene["kh_soloed_asset"] = self.object_name
+            self.report({'INFO'}, f"Soloed: {self.object_name}")
+        
+        # Force viewport update
+        context.view_layer.update()
+        
+        return {'FINISHED'}
+
+
 class ParticleSystemSelectOperator(bpy.types.Operator):
     bl_idname = "object.select_particle_system"
     bl_label = "Select Particle System"
@@ -1440,6 +1788,35 @@ class ParticleDeleteOperator(bpy.types.Operator):
     particle_system_index1: bpy.props.IntProperty()
     modifier_name: bpy.props.StringProperty(default="")
 
+    def _is_collection_used_elsewhere(self, coll, current_obj, current_mod_name="", current_psys_index=-1):
+        """Check if the collection is used by any other modifier or particle system on ANY object."""
+        for other_obj in bpy.data.objects:
+            if other_obj.type != 'MESH':
+                continue
+            
+            # Check GeoNodes modifiers
+            for mod in other_obj.modifiers:
+                if mod.type == 'NODES':
+                    # Skip the modifier we are about to delete
+                    if other_obj == current_obj and mod.name == current_mod_name:
+                        continue
+                    try:
+                        mod_coll = mod.get("Socket_7") or mod.get("Collection")
+                        if mod_coll and isinstance(mod_coll, bpy.types.Collection) and mod_coll == coll:
+                            return True
+                    except:
+                        pass
+            
+            # Check particle systems
+            for ps_idx, ps in enumerate(other_obj.particle_systems):
+                # Skip the particle system we are about to delete
+                if other_obj == current_obj and ps_idx == current_psys_index:
+                    continue
+                if ps.settings and ps.settings.instance_collection == coll:
+                    return True
+        
+        return False
+
     def execute(self, context):
         obj = context.object
         if not obj:
@@ -1449,7 +1826,7 @@ class ParticleDeleteOperator(bpy.types.Operator):
         if self.modifier_name:
             mod = obj.modifiers.get(self.modifier_name)
             if mod:
-                # Find collection to delete if it's a scatter collection
+                # Find collection associated with this modifier
                 coll = None
                 if mod.type == 'NODES':
                     try:
@@ -1458,13 +1835,16 @@ class ParticleDeleteOperator(bpy.types.Operator):
                     except:
                         pass
                 
-                # Delete collection objects and the collection itself if it's a KH/Scatter collection
+                # Only delete collection if it's NOT used by other modifiers/particle systems
                 if coll and isinstance(coll, bpy.types.Collection):
                     if coll.name.startswith(("KH-", "Scatter_")):
-                        # Delete all objects in this collection (and the collection)
-                        for o in list(coll.objects):
-                            bpy.data.objects.remove(o, do_unlink=True)
-                        bpy.data.collections.remove(coll)
+                        if not self._is_collection_used_elsewhere(coll, obj, current_mod_name=self.modifier_name):
+                            # Safe to delete - no other users
+                            for o in list(coll.objects):
+                                bpy.data.objects.remove(o, do_unlink=True)
+                            bpy.data.collections.remove(coll)
+                        else:
+                            print(f"KH-Scatter: Collection '{coll.name}' is shared with other surfaces, keeping it.")
 
                 obj.modifiers.remove(mod)
                 bpy.ops.outliner.orphans_purge(do_recursive=True)
@@ -1479,9 +1859,13 @@ class ParticleDeleteOperator(bpy.types.Operator):
                 # Find associated collection
                 coll = psys.settings.instance_collection
                 if coll and coll.name.startswith(("KH-", "Scatter_")):
-                    for o in list(coll.objects):
-                        bpy.data.objects.remove(o, do_unlink=True)
-                    bpy.data.collections.remove(coll)
+                    if not self._is_collection_used_elsewhere(coll, obj, current_psys_index=particle_system_index1):
+                        # Safe to delete - no other users
+                        for o in list(coll.objects):
+                            bpy.data.objects.remove(o, do_unlink=True)
+                        bpy.data.collections.remove(coll)
+                    else:
+                        print(f"KH-Scatter: Collection '{coll.name}' is shared with other surfaces, keeping it.")
 
                 # Find associated modifier
                 for mod in list(obj.modifiers):
@@ -1496,6 +1880,7 @@ class ParticleDeleteOperator(bpy.types.Operator):
 
 
 classes = ( kh_scatter_Panel,
+            kh_scatter_Project_Panel,
             kh_scatter_Asset_LIST_Panel,
             kh_scatter_Operator1,
             kh_KH_Grass1_Operator1,
@@ -1513,6 +1898,11 @@ classes = ( kh_scatter_Panel,
             kh_scatter_fur,
             kh_scatter_asset_library,
             kh_scatter_particle_asset_library,
+            KH_OT_SelectAssetInScene,
+            KH_OT_NavigateToScatter,
+            KH_OT_ToggleScatterVisibility,
+            KH_OT_DeleteScatterFromProject,
+            KH_OT_MakeSingleUser,
                 )
 
 def register():
